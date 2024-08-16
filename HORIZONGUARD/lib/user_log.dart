@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 
 class UserLogsScreen extends StatefulWidget {
   final List<Map<String, dynamic>> logs;
+  final Function() onRefresh; // Add a callback to refresh logs
 
-  const UserLogsScreen({super.key, required this.logs});
+  const UserLogsScreen({super.key, required this.logs, required this.onRefresh});
 
   @override
   _UserLogsScreenState createState() => _UserLogsScreenState();
 }
 
 class _UserLogsScreenState extends State<UserLogsScreen> {
+  List<Map<String, dynamic>> displayedLogs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    displayedLogs = widget.logs;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -19,13 +28,24 @@ class _UserLogsScreenState extends State<UserLogsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              widget.onRefresh(); // Call the refresh function
+              setState(() {
+                displayedLogs = widget.logs; // Update the displayed logs
+              });
+            },
+          ),
+        ],
       ),
-      body: widget.logs.isNotEmpty
+      body: displayedLogs.isNotEmpty
           ? ListView.builder(
               padding: const EdgeInsets.all(8.0),
-              itemCount: widget.logs.length,
+              itemCount: displayedLogs.length,
               itemBuilder: (context, index) {
-                final log = widget.logs[index];
+                final log = displayedLogs[index];
                 return Card(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15.0),
@@ -42,7 +62,7 @@ class _UserLogsScreenState extends State<UserLogsScreen> {
                         Text('Event Type: ${log['event_type'] ?? 'N/A'}'),
                         Text('Map ID: ${log['map_id'] ?? 'N/A'}'),
                         Text('Node ID: ${log['node_id'] ?? 'N/A'}'),
-                        Text('Sub Node Text: ${log['sub_node_text'] ?? 'N/A'}'),
+                        Text('Sub Node Text: ${log['sub_node_text']?.isNotEmpty ?? false ? log['sub_node_text'] : 'No Sub Node Text'}'),
                       ],
                     ),
                   ),
