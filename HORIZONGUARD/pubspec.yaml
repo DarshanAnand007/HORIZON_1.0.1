@@ -1,0 +1,33 @@
+name: tvapp
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+dependencies:
+  app_usage: ^3.0.1
+  collection: ^1.18.0
+  device_info_plus: ^10.1.0
+  flutter:
+    sdk: flutter
+  flutter_accessibility_service: ^0.2.4
+  flutter_background_service: ^5.0.6
+  flutter_local_notifications: ^17.2.1+2
+  hive: ^2.2.3
+  http: ^1.2.2
+  path_provider: ^2.1.4
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.2.3
+  socket_io_client: ^2.0.3+1
+  uuid: ^4.4.2
+  web_socket_channel: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
