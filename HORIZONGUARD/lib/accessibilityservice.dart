@@ -19,12 +19,13 @@ class HorizonLogs extends StatefulWidget {
 class _HorizonLogsState extends State<HorizonLogs> {
   StreamSubscription<AccessibilityEvent>? _subscription;
   List<Map<String, dynamic>> logBatch = [];
-  Map<String, dynamic>? lastLog;
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
     _loadLogs();
+    _startAutoSaveTimer();
   }
 
   void _loadLogs() async {
@@ -40,18 +41,26 @@ class _HorizonLogsState extends State<HorizonLogs> {
   }
 
   void handleAccessibilityStream() {
+    setState(() {
+      _isProcessing = true;
+    });
+
     if (_subscription?.isPaused ?? false) {
       _subscription?.resume();
+      setState(() {
+        _isProcessing = false;
+      });
       return;
     }
+
     _subscription =
         FlutterAccessibilityService.accessStream.listen((event) async {
       final newLog = logImportantDetails(event);
-
-      if (newLog.isNotEmpty) {
+      if (newLog != null && !isDuplicateLog(newLog)) {
         setState(() {
           logBatch.add(newLog);
         });
+        log('New Log Added: ${jsonEncode(newLog)}'); // Log the new entry to the terminal
       }
 
       if (logBatch.length >= 100) {
@@ -59,55 +68,52 @@ class _HorizonLogsState extends State<HorizonLogs> {
         logBatch.clear(); // Clear the batch after saving
       }
     });
+
+    setState(() {
+      _isProcessing = false;
+    });
   }
 
-  Map<String, dynamic> logImportantDetails(AccessibilityEvent event) {
+  Map<String, dynamic>? logImportantDetails(AccessibilityEvent event) {
     final packageName = event.packageName ?? "Unknown Package";
-    final capturedText = event.text ?? "";
-    final subNodeText = getSubNodeText(event.subNodes);
+    final capturedText = event.text?.trim();
+    final timestamp = DateTime.now().toString();
+    final eventType = event.eventType.toString();
+    final mapId = event.mapId ?? "No mapId";
+    final nodeId = event.nodeId ?? "No nodeId";
+    final subNodeText = getSubNodeText(event.subNodes).trim();
 
-    // 1. Check for duplicate log
-    if (lastLog != null && _isDuplicateLog(event, capturedText, subNodeText)) {
-      return {}; // Return an empty map to indicate no log should be stored
-    }
-
-    // 2. Check if both subNodeText and capturedText are empty
-    if ((capturedText.isEmpty || capturedText == 'null') &&
-        subNodeText.isEmpty) {
-      return {};
-    }
-
-    // 3. Check if package name is "com.example.tvapp"
-    if (packageName == "com.example.tvapp") {
-      log('scam');
-      return {};
+    // Do not filter out text fields that have meaningful content
+    if ((capturedText == null || capturedText.isEmpty || capturedText == 'null') &&
+        (subNodeText.isEmpty || subNodeText == 'null')) {
+      return null;
     }
 
     final logEntry = {
       'user_id': widget.userid,
       'package_name': packageName,
       'captured_text': capturedText,
-      'timestamp': DateTime.now().toString(),
-      'event_type': event.eventType.toString(),
-      'map_id': event.mapId ?? "No mapId",
-      'node_id': event.nodeId ?? "No nodeId",
+      'timestamp': timestamp,
+      'event_type': eventType,
+      'map_id': mapId,
+      'node_id': nodeId,
       'sub_node_text': subNodeText,
     };
 
-    lastLog = logEntry; // Update last log entry
-    log(subNodeText);
+    log('Processed Log: ${jsonEncode(logEntry)}'); // Log the processed entry to the terminal
+
     return logEntry;
   }
 
-  bool _isDuplicateLog(
-      AccessibilityEvent event, String capturedText, String subNodeText) {
-    return lastLog != null &&
-        lastLog!['package_name'] == event.packageName &&
-        lastLog!['captured_text'] == capturedText &&
-        lastLog!['event_type'] == event.eventType.toString() &&
-        lastLog!['map_id'] == event.mapId &&
-        lastLog!['node_id'] == event.nodeId &&
-        lastLog!['sub_node_text'] == subNodeText;
+  bool isDuplicateLog(Map<String, dynamic> newLog) {
+    return logBatch.any((log) =>
+      log['timestamp'] == newLog['timestamp'] &&
+      log['package_name'] == newLog['package_name'] &&
+      log['captured_text'] == newLog['captured_text'] &&
+      log['event_type'] == newLog['event_type'] &&
+      log['map_id'] == newLog['map_id'] &&
+      log['node_id'] == newLog['node_id'] &&
+      log['sub_node_text'] == newLog['sub_node_text']);
   }
 
   String getSubNodeText(List<AccessibilityEvent>? subNodes) {
@@ -121,8 +127,9 @@ class _HorizonLogsState extends State<HorizonLogs> {
           subNode.text != 'null') {
         texts.add(subNode.text!);
       }
+      // Recursively get text from nested sub-nodes
       final nestedSubNodeText = getSubNodeText(subNode.subNodes);
-      if (nestedSubNodeText is! String && nestedSubNodeText.isNotEmpty) {
+      if (nestedSubNodeText.isNotEmpty) {
         texts.add(nestedSubNodeText);
       }
     }
@@ -135,33 +142,26 @@ class _HorizonLogsState extends State<HorizonLogs> {
     await prefs.setStringList('accessibility_logs', storedLogs);
   }
 
+  void _startAutoSaveTimer() {
+    Timer.periodic(const Duration(minutes: 5), (timer) async {
+      if (logBatch.isNotEmpty) {
+        await _saveLogs();
+        setState(() {
+          logBatch.clear();
+        });
+      }
+    });
+  }
+
   Future<bool> doAction(AccessibilityEvent node, NodeAction action,
       [dynamic argument]) async {
     return await FlutterAccessibilityService.performAction(
         node, action, argument);
   }
 
-  void _clearLogs() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs
-        .remove('accessibility_logs'); // Clears the logs from SharedPreferences
-    setState(() {
-      logBatch.clear(); // Clears the logs from the local list
-    });
-
-    // Display a Snackbar with a confirmation message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Logs cleared successfully!'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
       home: Scaffold(
         appBar: AppBar(
@@ -197,8 +197,10 @@ class _HorizonLogsState extends State<HorizonLogs> {
                     ),
                     const SizedBox(height: 20.0),
                     TextButton(
-                      onPressed: handleAccessibilityStream,
-                      child: const Text("Start Stream"),
+                      onPressed: _isProcessing ? null : handleAccessibilityStream,
+                      child: _isProcessing
+                          ? const CircularProgressIndicator()
+                          : const Text("Start Stream"),
                     ),
                     const SizedBox(height: 20.0),
                     TextButton(
@@ -227,80 +229,88 @@ class _HorizonLogsState extends State<HorizonLogs> {
                 ),
               ),
               const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              UserLogsScreen(logs: logBatch), // Use local logs
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.deepPurpleAccent,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 20.0,
-                        horizontal: 40.0,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.0),
-                      ),
-                      elevation: 10,
-                      shadowColor: Colors.purpleAccent,
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          UserLogsScreen(logs: logBatch, onRefresh: () { 
+                            ElevatedButton(
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            UserLogsScreen(
+              logs: logBatch, 
+              onRefresh: _loadLogs, // Pass the refresh function
+            ),
+      ),
+    );
+  },
+  style: ElevatedButton.styleFrom(
+    foregroundColor: Colors.white, 
+    backgroundColor: Colors.deepPurpleAccent, 
+    padding: const EdgeInsets.symmetric(
+      vertical: 20.0,
+      horizontal: 40.0,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(30.0),
+    ),
+    elevation: 10,
+    shadowColor: Colors.purpleAccent,
+  ),
+  child: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: const [
+      Icon(Icons.auto_stories, size: 24.0),
+      SizedBox(width: 10),
+      Text(
+        'View User Logs',
+        style: TextStyle(
+          fontSize: 20.0,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    ],
+  ),
+);
+
+                           },), // Use local logs
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.auto_stories, size: 24.0),
-                        SizedBox(width: 10),
-                        Text(
-                          'View User Logs',
-                          style: TextStyle(
-                            fontSize: 20.0,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white, 
+                  backgroundColor: Colors.deepPurpleAccent, 
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20.0,
+                    horizontal: 40.0,
                   ),
-                  ElevatedButton(
-                    onPressed: _clearLogs, // Calls the _clearLogs function
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.deepPurpleAccent,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 20.0,
-                        horizontal: 40.0,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.0),
-                      ),
-                      elevation: 10,
-                      shadowColor: Colors.purpleAccent,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.delete, size: 24.0),
-                        SizedBox(width: 10),
-                        Text(
-                          'Clear Logs',
-                          style: TextStyle(
-                            fontSize: 20.0,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
                   ),
-                ],
+                  elevation: 10,
+                  shadowColor: Colors.purpleAccent,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.auto_stories, size: 24.0),
+                    SizedBox(width: 10),
+                    Text(
+                      'View User Logs',
+                      style: TextStyle(
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
