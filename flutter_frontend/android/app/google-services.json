@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "375966331566",
+    "project_id": "final-horizon-db9c2",
+    "storage_bucket": "final-horizon-db9c2.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375966331566:android:47d485ec3bc1ac24a6733f",
+        "android_client_info": {
+          "package_name": "com.example.flutter_frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZaJwZXRKwJ1QkCvK06W5TRBkIlxMzAPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375966331566:android:45a77680438a8b3aa6733f",
+        "android_client_info": {
+          "package_name": "com.example.tvapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZaJwZXRKwJ1QkCvK06W5TRBkIlxMzAPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
