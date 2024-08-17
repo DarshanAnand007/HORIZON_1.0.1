@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -12,11 +13,17 @@ import 'package:tvapp/accessibilityservice.dart';
 import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 Map<String, dynamic> globalData = {};
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await initializeService();
   runApp(const MyApp());
 }
@@ -96,6 +103,13 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+
+  // Ensure Firebase is initialized
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -292,6 +306,7 @@ class HorizonMonitorState extends State<HorizonMonitor> {
   @override
   void initState() {
     super.initState();
+
     fetchDeviceData();
     getUsageStats();
     // Add other initializations as needed
