@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserLogsScreen extends StatefulWidget {
-  const UserLogsScreen({super.key});
+  final String userId;
+
+  const UserLogsScreen({super.key, required this.userId});
 
   @override
   UserLogsScreenState createState() => UserLogsScreenState();
@@ -18,8 +19,7 @@ class UserLogsScreenState extends State<UserLogsScreen> {
   void initState() {
     super.initState();
     _fetchLogs();
-    _timer =
-        Timer.periodic(const Duration(seconds: 5), (timer) => _fetchLogs());
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) => _fetchLogs());
   }
 
   @override
@@ -30,15 +30,14 @@ class UserLogsScreenState extends State<UserLogsScreen> {
 
   Future<void> _fetchLogs() async {
     try {
-      final response =
-          await http.get(Uri.parse('http://192.168.0.106:4998/get_logs'));
-      if (response.statusCode == 200) {
-        setState(() {
-          logs = json.decode(response.body);
-        });
-      } else {
-        throw Exception('Failed to load logs');
-      }
+      // Fetch logs for the specific user from Firestore
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('accessibility_logs')
+          .where('user_id', isEqualTo: widget.userId)
+          .get();
+      setState(() {
+        logs = querySnapshot.docs.map((doc) => doc.data()).toList();
+      });
     } catch (e) {
       debugPrint("$e");
     }
@@ -67,7 +66,7 @@ class UserLogsScreenState extends State<UserLogsScreen> {
                 'Package name: ${log['package_name'] ?? 'N/A'}\n'
                 'event_type: ${log['event_type'] ?? 'N/A'}\n'
                 'Captured text: ${log['captured_text'] ?? 'N/A'}\n'
-                'Subnode Info: ${log['subnodeinfo'] ?? 'N/A'}',
+                'Subnode Info: ${log['sub_node_text'] ?? 'N/A'}',
               ),
             ),
           );

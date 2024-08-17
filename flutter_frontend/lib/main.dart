@@ -1,10 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_frontend/firebase_options.dart';
 import 'package:flutter_frontend/userdetail.dart';
-import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -37,15 +42,14 @@ class UserListScreen extends StatefulWidget {
 }
 
 class UserListScreenState extends State<UserListScreen> {
-  List<dynamic> users = [];
+  List<Map<String, dynamic>> users = [];
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
-    _timer =
-        Timer.periodic(const Duration(seconds: 5), (timer) => _fetchData());
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) => _fetchData());
   }
 
   @override
@@ -56,15 +60,18 @@ class UserListScreenState extends State<UserListScreen> {
 
   Future<void> _fetchData() async {
     try {
-      final response =
-          await http.get(Uri.parse('http://192.168.0.106:4998/get_all_users'));
-      if (response.statusCode == 200) {
-        setState(() {
-          users = json.decode(response.body);
-        });
-      } else {
-        throw Exception('Failed to load user data');
-      }
+      // Fetch data from Firestore
+      final querySnapshot = await FirebaseFirestore.instance.collection('horizon_monitor_logs').get();
+      setState(() {
+        users = querySnapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'user_id': data['device_id'] ?? 'N/A',  // Use device_id if user_id is missing
+            'updated_time': data['timestamp'] ?? 'N/A',
+            ...data  // Include all other fields in the document
+          };
+        }).toList();
+      });
     } catch (e) {
       debugPrint("$e");
     }
@@ -88,8 +95,8 @@ class UserListScreenState extends State<UserListScreen> {
             elevation: 4,
             margin: const EdgeInsets.symmetric(vertical: 8.0),
             child: ListTile(
-              title: Text(user['user_id'] ?? 'N/A'),
-              subtitle: Text('Last Updated: ${user['updated_time'] ?? 'N/A'}'),
+              title: Text(user['user_id']),
+              subtitle: Text('Last Updated: ${user['updated_time']}'),
               trailing: const Icon(Icons.arrow_forward_ios),
               onTap: () {
                 Navigator.push(

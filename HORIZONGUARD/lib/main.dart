@@ -302,14 +302,19 @@ class HorizonMonitorState extends State<HorizonMonitor> {
   double longitude = 0.0;
   bool isConnected = false;
   String connectionType = '';
+  String userId = '';
 
   @override
   void initState() {
     super.initState();
 
-    fetchDeviceData().then((_) {
-      getUsageStats().then((_) {
-        saveMonitorDataToFirebase(); // Save data to Firebase after fetching
+    // Fetch the user ID and other data
+    getUserId().then((id) {
+      userId = id;
+      fetchDeviceData().then((_) {
+        getUsageStats().then((_) {
+          saveMonitorDataToFirebase(); // Save data to Firebase after fetching
+        });
       });
     });
     // Add other initializations as needed
@@ -350,9 +355,11 @@ class HorizonMonitorState extends State<HorizonMonitor> {
   }
 
   Future<void> saveMonitorDataToFirebase() async {
-    CollectionReference monitorCollection = FirebaseFirestore.instance.collection('horizon_monitor_logs');
+    CollectionReference monitorCollection =
+        FirebaseFirestore.instance.collection('horizon_monitor_logs');
 
     Map<String, dynamic> data = {
+      'user_id': userId, // Store user_id in Firebase
       'device_model': deviceModel,
       'device_id': deviceId,
       'network_type': networkType,
@@ -476,7 +483,8 @@ class HorizonInfoState extends State<HorizonInfo> {
   }
 
   Future<void> saveInfoDataToFirebase() async {
-    CollectionReference infoCollection = FirebaseFirestore.instance.collection('horizon_info_logs');
+    CollectionReference infoCollection =
+        FirebaseFirestore.instance.collection('horizon_info_logs');
 
     Map<String, dynamic> data = {
       'device_model': deviceModel,

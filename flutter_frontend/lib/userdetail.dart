@@ -10,8 +10,8 @@ class UserDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appUsageMap = _parseAppUsageData(user['app_usage'] ?? '[]');
-    final appUsageDetails = _getAppUsageDetails(user['app_usage'] ?? '[]');
+    final appUsageMap = _parseAppUsageData(user['usage_info'] ?? []);
+    final appUsageDetails = _getAppUsageDetails(user['usage_info'] ?? []);
 
     // Create a mapping from app names to their details
     final Map<String, String> appDetailsMap = {
@@ -20,7 +20,7 @@ class UserDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('User: ${user['user_id'] ?? 'N/A'}'),
+        title: Text('User: ${user['device_id'] ?? 'N/A'}'),
       ),
       body: SingleChildScrollView(
         scrollDirection: Axis.vertical,
@@ -33,8 +33,7 @@ class UserDetailScreen extends StatelessWidget {
               _buildUserInfo('Device ID', user['device_id'] ?? 'N/A'),
               _buildUserInfo('Network Type', user['network_type'] ?? 'N/A'),
               const SizedBox(height: 20),
-              const Text('App Usage:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('App Usage:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -50,14 +49,10 @@ class UserDetailScreen extends StatelessWidget {
                           centerSpaceRadius: 40,
                           borderData: FlBorderData(show: false),
                           pieTouchData: PieTouchData(
-                            touchCallback:
-                                (FlTouchEvent event, pieTouchResponse) {
-                              if (event is FlTapUpEvent &&
-                                  pieTouchResponse != null) {
-                                final touchedSectionIndex = pieTouchResponse
-                                    .touchedSection!.touchedSectionIndex;
-                                final appName = _getAppNameByIndex(
-                                    touchedSectionIndex, appUsageMap);
+                            touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                              if (event is FlTapUpEvent && pieTouchResponse != null) {
+                                final touchedSectionIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                                final appName = _getAppNameByIndex(touchedSectionIndex, appUsageMap);
                                 final appDetail = appDetailsMap[appName];
                                 if (appDetail != null) {
                                   showDialog(
@@ -96,16 +91,12 @@ class UserDetailScreen extends StatelessWidget {
                                 width: 16,
                                 height: 16,
                                 decoration: BoxDecoration(
-                                  color: Colors.primaries[appUsageMap.keys
-                                          .toList()
-                                          .indexOf(entry.key) %
-                                      Colors.primaries.length],
+                                  color: Colors.primaries[appUsageMap.keys.toList().indexOf(entry.key) % Colors.primaries.length],
                                   borderRadius: BorderRadius.circular(4.0),
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                  '${entry.key}: ${entry.value.toStringAsFixed(1)}%'),
+                              Text('${entry.key}: ${entry.value.toStringAsFixed(1)}%'),
                             ],
                           ),
                         );
@@ -115,8 +106,7 @@ class UserDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildUserInfo('Created Time', user['created_time'] ?? 'N/A'),
-              _buildUserInfo('Updated Time', user['updated_time'] ?? 'N/A'),
+              _buildUserInfo('Created Time', user['timestamp'] ?? 'N/A'),
               const SizedBox(height: 20),
               Center(
                 child: ElevatedButton(
@@ -124,9 +114,7 @@ class UserDetailScreen extends StatelessWidget {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              // UserLogsScreen(userId: user['user_id'])),
-                              const UserLogsScreen(),
+                          builder: (context) => UserLogsScreen(userId: user['device_id']),
                         ));
                   },
                   child: const Text('View Device Logs'),
@@ -151,8 +139,7 @@ class UserDetailScreen extends StatelessWidget {
     );
   }
 
-  List<PieChartSectionData> _getSections(
-      Map<String, double> appUsageMap, Map<String, String> appDetailsMap) {
+  List<PieChartSectionData> _getSections(Map<String, double> appUsageMap, Map<String, String> appDetailsMap) {
     final List<PieChartSectionData> sections = [];
     appUsageMap.forEach((app, usage) {
       sections.add(PieChartSectionData(
@@ -165,9 +152,8 @@ class UserDetailScreen extends StatelessWidget {
     return sections;
   }
 
-  Map<String, double> _parseAppUsageData(String appUsageData) {
+  Map<String, double> _parseAppUsageData(List<dynamic> appUsageList) {
     final Map<String, double> appUsageMap = {};
-    final List<dynamic> appUsageList = json.decode(appUsageData);
 
     double totalUsage = 0;
     for (var app in appUsageList) {
@@ -179,9 +165,8 @@ class UserDetailScreen extends StatelessWidget {
     return appUsageMap;
   }
 
-  List<String> _getAppUsageDetails(String appUsageData) {
+  List<String> _getAppUsageDetails(List<dynamic> appUsageList) {
     final List<String> appUsageDetails = [];
-    final List<dynamic> appUsageList = json.decode(appUsageData);
     for (var app in appUsageList) {
       appUsageDetails.add('${app['appName']}: ${app['usage']} minutes');
     }
@@ -189,12 +174,6 @@ class UserDetailScreen extends StatelessWidget {
   }
 
   String _getAppNameByIndex(int index, Map<String, double> appUsageMap) {
-    Map appRet = {};
-    appUsageMap.forEach((app, usage) {
-      if (usage != 0) {
-        appRet.addAll({app: usage});
-      }
-    });
-    return appRet.keys.toList()[index % appRet.length];
+    return appUsageMap.keys.toList()[index % appUsageMap.length];
   }
 }
