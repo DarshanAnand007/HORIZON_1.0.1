@@ -8,16 +8,25 @@ environment:
 
 dependencies:
   app_usage: ^3.0.1
+  cloud_firestore: ^4.14.0
   collection: ^1.18.0
+  csv: ^6.0.0
   device_info_plus: ^10.1.0
+  excel: ^4.0.3
+  firebase_core: ^2.24.2
   flutter:
     sdk: flutter
   flutter_accessibility_service: ^0.2.4
   flutter_background_service: ^5.0.6
   flutter_local_notifications: ^17.2.1+2
+  google_sign_in: ^6.2.1
+  googleapis: ^13.2.0
+  googleapis_auth: ^1.6.0
   hive: ^2.2.3
   http: ^1.2.2
+  open_file: ^3.3.2
   path_provider: ^2.1.4
+  pdf: ^3.11.1
   permission_handler: ^11.3.1
   shared_preferences: ^2.2.3
   socket_io_client: ^2.0.3+1

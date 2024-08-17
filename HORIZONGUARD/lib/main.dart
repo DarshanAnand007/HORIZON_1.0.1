@@ -307,8 +307,11 @@ class HorizonMonitorState extends State<HorizonMonitor> {
   void initState() {
     super.initState();
 
-    fetchDeviceData();
-    getUsageStats();
+    fetchDeviceData().then((_) {
+      getUsageStats().then((_) {
+        saveMonitorDataToFirebase(); // Save data to Firebase after fetching
+      });
+    });
     // Add other initializations as needed
   }
 
@@ -344,6 +347,34 @@ class HorizonMonitorState extends State<HorizonMonitor> {
     } on AppUsageException catch (exception) {
       debugPrint('$exception');
     }
+  }
+
+  Future<void> saveMonitorDataToFirebase() async {
+    CollectionReference monitorCollection = FirebaseFirestore.instance.collection('horizon_monitor_logs');
+
+    Map<String, dynamic> data = {
+      'device_model': deviceModel,
+      'device_id': deviceId,
+      'network_type': networkType,
+      'latitude': latitude,
+      'longitude': longitude,
+      'is_connected': isConnected,
+      'connection_type': connectionType,
+      'usage_info': _infos.map((info) {
+        return {
+          'appName': info.appName,
+          'packageName': info.packageName,
+          'usage': info.usage.inMinutes,
+          'startDate': info.startDate.toIso8601String(),
+          'endDate': info.endDate.toIso8601String(),
+        };
+      }).toList(),
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    await monitorCollection.add(data).catchError((error) {
+      debugPrint('Failed to add monitor data: $error');
+    });
   }
 
   @override
@@ -417,8 +448,10 @@ class HorizonInfoState extends State<HorizonInfo> {
   @override
   void initState() {
     super.initState();
-    fetchDeviceData();
-    fetchCurrentDate();
+    fetchDeviceData().then((_) {
+      fetchCurrentDate();
+      saveInfoDataToFirebase(); // Save data to Firebase after fetching
+    });
   }
 
   Future<void> fetchDeviceData() async {
@@ -439,6 +472,20 @@ class HorizonInfoState extends State<HorizonInfo> {
   void fetchCurrentDate() {
     setState(() {
       currentDate = DateTime.now().toString();
+    });
+  }
+
+  Future<void> saveInfoDataToFirebase() async {
+    CollectionReference infoCollection = FirebaseFirestore.instance.collection('horizon_info_logs');
+
+    Map<String, dynamic> data = {
+      'device_model': deviceModel,
+      'current_date': currentDate,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    await infoCollection.add(data).catchError((error) {
+      debugPrint('Failed to add info data: $error');
     });
   }
 
