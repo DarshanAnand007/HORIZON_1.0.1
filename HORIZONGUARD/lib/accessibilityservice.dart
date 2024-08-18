@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firebase Firestore
 import 'package:tvapp/user_log.dart';
 import 'export.dart'; // Import the export screen
+import 'package:device_info_plus/device_info_plus.dart';
 
 class HorizonLogs extends StatefulWidget {
   const HorizonLogs({super.key, required this.userid, required String ip});
@@ -138,10 +139,21 @@ class _HorizonLogsState extends State<HorizonLogs> {
     // Store logs locally
     await prefs.setStringList('accessibility_logs', storedLogs);
 
-    // Send logs to Firebase Firestore only if subNodeText has changed
-    CollectionReference logsCollection = FirebaseFirestore.instance.collection('accessibility_logs');
+    // Retrieve the device ID
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+    String deviceId = androidInfo.id;
 
+    // Reference to Firestore collection
+    CollectionReference logsCollection =
+        FirebaseFirestore.instance.collection('accessibility_logs');
+
+    // Iterate over the logBatch and send to Firebase Firestore
     for (var log in logBatch) {
+      // Add the device ID to each log
+      log['device'] = deviceId;
+
+      // Check if subNodeText has changed before sending the log
       if (log['sub_node_text'] != lastLog?['sub_node_text']) {
         await logsCollection.add(log).catchError((error) {
           debugPrint('Failed to add log: $error');
@@ -250,8 +262,10 @@ class _HorizonLogsState extends State<HorizonLogs> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              UserLogsScreen(logs: logBatch, onRefresh: () {  },), // Use local logs
+                          builder: (context) => UserLogsScreen(
+                            logs: logBatch,
+                            onRefresh: () {},
+                          ), // Use local logs
                         ),
                       );
                     },
@@ -320,7 +334,8 @@ class _HorizonLogsState extends State<HorizonLogs> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ExportScreen(), // Navigate to the ExportScreen
+                          builder: (context) =>
+                              const ExportScreen(), // Navigate to the ExportScreen
                         ),
                       );
                     },

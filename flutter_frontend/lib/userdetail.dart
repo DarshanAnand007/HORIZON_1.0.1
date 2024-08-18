@@ -114,7 +114,7 @@ class UserDetailScreen extends StatelessWidget {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => UserLogsScreen(userId: user['device_id']),
+                          builder: (context) => UserLogsScreen(deviceId: user['device_id']),
                         ));
                   },
                   child: const Text('View Device Logs'),

@@ -64,7 +64,7 @@ class UserListScreenState extends State<UserListScreen> {
       final querySnapshot = await FirebaseFirestore.instance.collection('horizon_monitor_logs').get();
       setState(() {
         users = querySnapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           return {
             'user_id': data['device_id'] ?? 'N/A',  // Use device_id if user_id is missing
             'updated_time': data['timestamp'] ?? 'N/A',

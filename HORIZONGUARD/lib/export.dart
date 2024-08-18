@@ -1,3 +1,5 @@
+// ignore_for_file: no_leading_underscores_for_local_identifiers
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,11 +10,13 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart';
 
 class ExportScreen extends StatefulWidget {
+  const ExportScreen({super.key});
+
   @override
-  _ExportScreenState createState() => _ExportScreenState();
+  ExportScreenState createState() => ExportScreenState();
 }
 
-class _ExportScreenState extends State<ExportScreen> {
+class ExportScreenState extends State<ExportScreen> {
   final _formKey = GlobalKey<FormState>();
   DateTime? _startDate;
   TimeOfDay? _startTime;
@@ -134,7 +138,7 @@ class _ExportScreenState extends State<ExportScreen> {
       ClientId(_clientId, _clientSecret),
       _scopes,
       (url) {
-        print("Please go to the following URL and grant access: $url");
+        debugPrint("Please go to the following URL and grant access: $url");
       },
     );
 
@@ -154,14 +158,14 @@ class _ExportScreenState extends State<ExportScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Export Successful"),
-          content: Text("The logs have been successfully exported to Google Drive."),
+          title: const Text("Export Successful"),
+          content: const Text("The logs have been successfully exported to Google Drive."),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("OK"),
+              child: const Text("OK"),
             ),
           ],
         );
@@ -173,9 +177,9 @@ class _ExportScreenState extends State<ExportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Export Data'),
+        title: const Text('Export Data'),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -188,11 +192,11 @@ class _ExportScreenState extends State<ExportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 "Select Start Date and Time:",
                 style: TextStyle(fontSize: 16),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   ElevatedButton(
@@ -201,7 +205,7 @@ class _ExportScreenState extends State<ExportScreen> {
                         ? _startDate!.toLocal().toString().split(' ')[0]
                         : 'Select start date'),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () => _selectTime(context, true),
                     child: Text(_startTime != null
@@ -210,12 +214,12 @@ class _ExportScreenState extends State<ExportScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
-              Text(
+              const SizedBox(height: 16),
+              const Text(
                 "Select End Date and Time:",
                 style: TextStyle(fontSize: 16),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   ElevatedButton(
@@ -224,7 +228,7 @@ class _ExportScreenState extends State<ExportScreen> {
                         ? _endDate!.toLocal().toString().split(' ')[0]
                         : 'Select end date'),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () => _selectTime(context, false),
                     child: Text(_endTime != null
@@ -233,19 +237,19 @@ class _ExportScreenState extends State<ExportScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
               _errorMessage != null
                   ? Text(
                       _errorMessage!,
-                      style: TextStyle(color: Colors.red),
+                      style: const TextStyle(color: Colors.red),
                     )
                   : Container(),
-              Spacer(),
+              const Spacer(),
               _isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: _exportLogs,
-                      child: Text("Export Logs"),
+                      child: const Text("Export Logs"),
                     ),
             ],
           ),

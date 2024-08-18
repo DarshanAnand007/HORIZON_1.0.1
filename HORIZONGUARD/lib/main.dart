@@ -268,17 +268,6 @@ class HomeScreen extends StatelessWidget {
                 );
               },
             ),
-            ElevatedButton(
-              child: const Text('Horizon Info'),
-              onPressed: () async {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HorizonInfo(),
-                  ),
-                );
-              },
-            ),
           ],
         ),
       ),
@@ -309,10 +298,13 @@ class HorizonMonitorState extends State<HorizonMonitor> {
     super.initState();
 
     // Fetch the user ID and other data
+
     getUserId().then((id) {
       userId = id;
+      log(userId);
       fetchDeviceData().then((_) {
         getUsageStats().then((_) {
+          log(userId);
           saveMonitorDataToFirebase(); // Save data to Firebase after fetching
         });
       });
@@ -357,7 +349,9 @@ class HorizonMonitorState extends State<HorizonMonitor> {
   Future<void> saveMonitorDataToFirebase() async {
     CollectionReference monitorCollection =
         FirebaseFirestore.instance.collection('horizon_monitor_logs');
+    log('herrrrrrrrrrrrrrrrrrrrrrr');
 
+    // Prepare the data to be saved
     Map<String, dynamic> data = {
       'user_id': userId, // Store user_id in Firebase
       'device_model': deviceModel,
@@ -379,9 +373,31 @@ class HorizonMonitorState extends State<HorizonMonitor> {
       'timestamp': DateTime.now().toIso8601String(),
     };
 
-    await monitorCollection.add(data).catchError((error) {
-      debugPrint('Failed to add monitor data: $error');
-    });
+    debugPrint('x1B[31m $data x1B[0m');
+    debugPrint('x1B[31m data sent x1B[0m');
+
+    try {
+      // Query the collection to check if a document with the same device_id exists
+      QuerySnapshot query = await monitorCollection
+          .where('device_id', isEqualTo: deviceId)
+          .limit(1)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        // If a document with the same device_id exists, update it
+        DocumentReference docRef = query.docs.first.reference;
+        await docRef.update(data).catchError((error) {
+          debugPrint('Failed to update monitor data: $error');
+        });
+      } else {
+        // If no document with the same device_id exists, create a new document
+        await monitorCollection.add(data).catchError((error) {
+          debugPrint('Failed to add monitor data: $error');
+        });
+      }
+    } catch (error) {
+      debugPrint('Failed to save monitor data: $error');
+    }
   }
 
   @override
