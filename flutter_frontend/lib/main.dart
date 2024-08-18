@@ -20,13 +20,25 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'User Activity Monitor',
+      title: 'Horizon Guard',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.white,
+        primarySwatch: Colors.teal,
+        scaffoldBackgroundColor: Colors.grey[100],
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.teal,
+          titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontSize: 16, color: Colors.black),
+          bodyLarge: TextStyle(fontSize: 16, color: Colors.black87),
           bodyMedium: TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        cardTheme: CardTheme(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          elevation: 6,
+          margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+          color: Colors.white,
         ),
       ),
       home: const UserListScreen(),
@@ -43,24 +55,20 @@ class UserListScreen extends StatefulWidget {
 
 class UserListScreenState extends State<UserListScreen> {
   List<Map<String, dynamic>> users = [];
-  Timer? _timer;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) => _fetchData());
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+    _fetchData();  // Fetch data when the screen is first loaded
   }
 
   Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      // Fetch data from Firestore
       final querySnapshot = await FirebaseFirestore.instance.collection('horizon_monitor_logs').get();
       setState(() {
         users = querySnapshot.docs.map((doc) {
@@ -71,9 +79,13 @@ class UserListScreenState extends State<UserListScreen> {
             ...data  // Include all other fields in the document
           };
         }).toList();
+        _isLoading = false;
       });
     } catch (e) {
       debugPrint("$e");
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -81,35 +93,47 @@ class UserListScreenState extends State<UserListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Activity Monitor'),
+        title: const Text('Horizon Guard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchData,  // Trigger manual refresh when clicked
+          ),
+        ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(8.0),
-        itemCount: users.length,
-        itemBuilder: (context, index) {
-          final user = users[index];
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15.0),
-            ),
-            elevation: 4,
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
-            child: ListTile(
-              title: Text(user['user_id']),
-              subtitle: Text('Last Updated: ${user['updated_time']}'),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => UserDetailScreen(user: user),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(8.0),
+              itemCount: users.length,
+              itemBuilder: (context, index) {
+                final user = users[index];
+                return Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.teal,
+                      child: Text(user['user_id'][0], style: const TextStyle(color: Colors.white)),
+                    ),
+                    title: Text(user['user_id'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Last Updated: ${user['updated_time']}'),
+                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.teal),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserDetailScreen(user: user),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
             ),
-          );
-        },
-      ),
     );
   }
 }

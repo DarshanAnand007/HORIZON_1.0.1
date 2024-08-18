@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_frontend/userlogs.dart';
-import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 
 class UserDetailScreen extends StatelessWidget {
@@ -13,7 +12,6 @@ class UserDetailScreen extends StatelessWidget {
     final appUsageMap = _parseAppUsageData(user['usage_info'] ?? []);
     final appUsageDetails = _getAppUsageDetails(user['usage_info'] ?? []);
 
-    // Create a mapping from app names to their details
     final Map<String, String> appDetailsMap = {
       for (var detail in appUsageDetails) detail.split(': ')[0]: detail,
     };
@@ -33,7 +31,7 @@ class UserDetailScreen extends StatelessWidget {
               _buildUserInfo('Device ID', user['device_id'] ?? 'N/A'),
               _buildUserInfo('Network Type', user['network_type'] ?? 'N/A'),
               const SizedBox(height: 20),
-              const Text('App Usage:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('App Usage:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.teal)),
               const SizedBox(height: 10),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -45,7 +43,7 @@ class UserDetailScreen extends StatelessWidget {
                       child: PieChart(
                         PieChartData(
                           sections: _getSections(appUsageMap, appDetailsMap),
-                          sectionsSpace: 0,
+                          sectionsSpace: 2,
                           centerSpaceRadius: 40,
                           borderData: FlBorderData(show: false),
                           pieTouchData: PieTouchData(
@@ -66,7 +64,7 @@ class UserDetailScreen extends StatelessWidget {
                                             onPressed: () {
                                               Navigator.of(context).pop();
                                             },
-                                            child: const Text('Close'),
+                                            child: const Text('Close', style: TextStyle(color: Colors.teal)),
                                           ),
                                         ],
                                       );
@@ -96,7 +94,10 @@ class UserDetailScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text('${entry.key}: ${entry.value.toStringAsFixed(1)}%'),
+                              Text(
+                                '${entry.key}: ${entry.value.toStringAsFixed(1)}%',
+                                style: const TextStyle(fontSize: 14, color: Colors.black87),
+                              ),
                             ],
                           ),
                         );
@@ -110,14 +111,22 @@ class UserDetailScreen extends StatelessWidget {
               const SizedBox(height: 20),
               Center(
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white, backgroundColor: Colors.teal, // Text color
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
                   onPressed: () {
                     Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => UserLogsScreen(deviceId: user['device_id']),
-                        ));
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserLogsScreen(deviceId: user['device_id']),
+                      ),
+                    );
                   },
-                  child: const Text('View Device Logs'),
+                  child: const Text('View Device Logs', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],
@@ -132,8 +141,8 @@ class UserDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value)),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 16, color: Colors.black87))),
         ],
       ),
     );

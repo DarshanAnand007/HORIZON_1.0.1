@@ -13,6 +13,7 @@ dependencies:
   fl_chart: ^0.68.0
   firebase_core: ^2.24.2
   cloud_firestore: ^4.14.0
+  flutter_highlight: ^0.7.0
 
 
 dev_dependencies:
